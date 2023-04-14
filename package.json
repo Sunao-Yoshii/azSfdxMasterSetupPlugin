@@ -7,6 +7,7 @@
     "@salesforce/core": "^3.33.1",
     "@salesforce/kit": "^1.8.4",
     "@salesforce/sf-plugins-core": "^2.0.1",
+    "csv-parse": "^5.3.6",
     "tslib": "^2"
   },
   "devDependencies": {
@@ -17,6 +18,7 @@
     "@salesforce/prettier-config": "^0.0.2",
     "@salesforce/ts-sinon": "1.3.21",
     "@swc/core": "^1.3.19",
+    "@types/node": "^18.15.11",
     "@typescript-eslint/eslint-plugin": "^5.36.1",
     "@typescript-eslint/parser": "^5.36.1",
     "chai": "^4.3.6",
@@ -67,8 +69,13 @@
       "@oclif/plugin-help"
     ],
     "topics": {
-      "hello": {
-        "description": "Commands to say hello."
+      "azalea": {
+        "description": "description for azalea",
+        "subtopics": {
+          "data": {
+            "description": "description for azalea.data"
+          }
+        }
       }
     }
   },
