@@ -1,0 +1,2 @@
+Id,Name(text),Account__c(ref),checkboxField__c(bool),dateField__c(date),datetimeField__c(datetime),numberField__c(num),percent__c(per),textField__c(text),timeField__c(time)
+Sample01,Sample01,AccountId2,true,2023-04-16,2023-04-16T09:00+09:00,24.9,56,Welcome plugin!,09:00:00.000Z
