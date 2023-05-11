@@ -9,6 +9,7 @@ const messages = Messages.load('azalea-works', 'azalea.data.apply', [
   'description',
   'examples',
   'flags.user.summary',
+  'flags.transactsize.summary',
   'flags.directory.summary',
 ]);
 
@@ -33,6 +34,12 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
       required: false,
       default: 'data'
     }),
+    execsize: Flags.string({
+      summary: messages.getMessage('flags.transactsize.summary'),
+      char: 's',
+      required: false,
+      default: 20
+    }),
   };
 
   public async run(): Promise<AzaleaDataApplyResult> {
@@ -40,8 +47,9 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
 
     const user = flags.user;
     const directory = flags.directory;
+    const maxsize = flags.execsize;
 
-    this.log(`Running as ${user}. Searching csv files from ${directory}.`);
+    this.log(`Running as ${user}. Searching csv files from ${directory}.(Transaction size : ${maxsize})`);
 
     // load files.
     const csvNames = await findCsv(directory);
@@ -65,7 +73,7 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
     // loop execution files.
     for (const filename of csvNames) {
       this.log(`Executing ${filename}.....`);
-      await executeByCsv(directory, filename, connection, idMap);
+      await executeByCsv(directory, filename, connection, idMap, maxsize);
     }
 
     return {

@@ -37,7 +37,11 @@ Salesforce 組織のユーザ名を指定します。
 
 # flags.directory.summary
 
-CSV 
+CSV ファイルを格納するディレクトリを指定します。
+
+# flags.transactsize.summary
+
+1回のDMLの最大実効サイズを指定します。デフォルトは 20 です。
 
 # examples
 

@@ -122,8 +122,6 @@ class CsvLoader {
       // カラムをパース
       const fieldRegex = new RegExp('^(.+?)\\(([a-z]+)\\)$', 'g');
       const elems = fieldRegex.exec(test);
-      // console.log(test);
-      // console.log(elems);
       if (!elems || elems.length < 3) {
         throw new Error('Field definition must be `fieldName(type)` : ' + v);
       }
@@ -159,18 +157,12 @@ class CsvLoader {
     const filepath = `${dirname}/${fileName}`;
     const fileContent = fs.readFileSync(filepath, 'utf-8');
     const records = parse(fileContent) as string[][];
-    // console.log('at loadCsv:');
-    // console.log(filepath);
-    // console.log(fileContent);
-    // console.log(records);
 
     // ヘッダ読み込み
     this.columnDefs = CsvLoader.parseHeader(records.shift());
-    // console.log(this.columnDefs);
 
     // 行データの読み込み
     this.rows = records.map(row => new Row(this.columnDefs, row));
-    // console.log('with rows');
   }
 }
 
@@ -181,91 +173,102 @@ function outputError(saveRes: SaveResult, filename: string, index: number): void
   });
 }
 
-async function insertDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>): Promise<Map<string, string>> {
+function chunk<T extends any[]>(arr: T, size: number) {
+  return arr.reduce(
+      (newarr, _, i) => (i % size ? newarr : [...newarr, arr.slice(i, i + size)]),
+      [] as T[][]
+  )
+}
+
+async function insertDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>, transactSize: number): Promise<Map<string, string>> {
   const dataset = csvLoader.getAsJson();
   console.log('insert:');
-  console.log(dataset);
 
-  // insert リクエスト
-  const saveResult = await connection.sobject(sobject).create(dataset);
-
-  // const saveResult = await connection.insert(sobject, dataset);
   let index = 0;
-  saveResult.forEach(saveRes => {
-    if (saveRes.errors.length > 0) {
-      outputError(saveRes, csvLoader.fileName, index);
-    } else {
-      const idKey = csvLoader.rows[index].getIdKey();
-      const idValue = saveRes.id;
-      idMap.set(idKey, idValue);
-    }
-    index++;
-  });
-  // console.log(saveResult);
-  // console.log(idMap);
+  const chunkedArrays = chunk(dataset, transactSize);
+  for (const data of chunkedArrays) {
+
+    // insert リクエスト
+    const saveResult = await connection.sobject(sobject).create(data);
+    saveResult.forEach(saveRes => {
+      if (saveRes.errors.length > 0) {
+        outputError(saveRes, csvLoader.fileName, index);
+      } else {
+        const idKey = csvLoader.rows[index].getIdKey();
+        const idValue = saveRes.id;
+        idMap.set(idKey, idValue);
+      }
+      index++;
+    });
+  }
+
   return idMap;
 }
 
-async function deleteDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>): Promise<Map<string, string>> {
+async function deleteDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>, transactSize: number): Promise<Map<string, string>> {
   const dataset = csvLoader.getAsJson();
   const deleteIds = dataset.map(v => v['Id'] as string);
 
   console.log('delete:');
-  console.log(dataset);
-
-  // delete リクエスト
-  const saveResult = await connection.sobject(sobject).del(deleteIds);
-
+  const chunkedArrays = chunk(deleteIds, transactSize);
   let index = 0;
-  saveResult.forEach(saveRes => {
-    if (saveRes.errors.length > 0) {
-      outputError(saveRes, csvLoader.fileName, index);
-    } else {
-      const idKey = csvLoader.rows[index].getIdKey();
-      idMap.delete(idKey);
-    }
-    index++;
-  });
+
+  for (const targets of chunkedArrays) {
+
+    // delete リクエスト
+    const saveResult = await connection.sobject(sobject).del(targets);
+
+    saveResult.forEach(saveRes => {
+      if (saveRes.errors.length > 0) {
+        outputError(saveRes, csvLoader.fileName, index);
+      } else {
+        const idKey = csvLoader.rows[index].getIdKey();
+        idMap.delete(idKey);
+      }
+      index++;
+    });
+  }
+
 
   return idMap;
 }
 
-async function updateDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>): Promise<Map<string, string>> {
+async function updateDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>, transactSize: number): Promise<Map<string, string>> {
   const dataset = csvLoader.getAsJson();
   console.log('update:');
-  // console.log(dataset);
 
-  // 更新対象を org から取得
-  const targetIds = dataset.map(v => v['Id'] as string);
-  let recs = await connection.sobject(sobject)
-    .find({ Id: { $in : targetIds } }, 'Id');
+  const chunkedArrays = chunk(dataset, transactSize);
 
-  // 更新項目の適用
-  recs = recs.map(rec => {
-    const id = rec.Id;
-    const updateValues = dataset.find(v => v['Id'] === id);
-    return {
-      Id: id,
-      ...updateValues
-    };
-  });
-  console.log(recs);
-
-  // update リクエスト
-  const saveResult = await connection.sobject(sobject).update(recs);
-
-  // const saveResult = await connection.insert(sobject, dataset);
   let index = 0;
-  saveResult.forEach(saveRes => {
-    if (saveRes.errors.length > 0) {
-      outputError(saveRes, csvLoader.fileName, index);
-    }
-    index++;
-  });
+  for (const targets of chunkedArrays) {
+    // 更新対象を org から取得
+    const targetIds = targets.map(v => v['Id'] as string);
+    let recs = await connection.sobject(sobject)
+      .find({ Id: { $in : targetIds } }, 'Id');
+
+    // 更新項目の適用
+    recs = recs.map(rec => {
+      const id = rec.Id;
+      const updateValues = targets.find(v => v['Id'] === id);
+      return {
+        Id: id,
+        ...updateValues
+      };
+    });
+
+    // update リクエスト
+    const saveResult = await connection.sobject(sobject).update(recs);
+    saveResult.forEach(saveRes => {
+      if (saveRes.errors.length > 0) {
+        outputError(saveRes, csvLoader.fileName, index);
+      }
+      index++;
+    });
+  }
   return idMap;
 }
 
-export async function executeByCsv(dirname: string, filename: string, connection: Connection, idMap: Map<string, string>): Promise<Map<string, string>> {
+export async function executeByCsv(dirname: string, filename: string, connection: Connection, idMap: Map<string, string>, transactSize: number): Promise<Map<string, string>> {
   const oprAndObj = extractCoc(filename);
   console.log('at executeByCsv:');
   console.log(oprAndObj);
@@ -276,11 +279,11 @@ export async function executeByCsv(dirname: string, filename: string, connection
   const csvLoader = new CsvLoader(idMap, filename, dirname);
 
   if (operation === 'insert') {
-    return insertDatas(connection, sobject, csvLoader, idMap);
+    return insertDatas(connection, sobject, csvLoader, idMap, transactSize);
   } if (operation === 'delete') {
-    return deleteDatas(connection, sobject, csvLoader, idMap);
+    return deleteDatas(connection, sobject, csvLoader, idMap, transactSize);
   } if (operation === 'update') {
-    return updateDatas(connection, sobject, csvLoader, idMap);
+    return updateDatas(connection, sobject, csvLoader, idMap, transactSize);
   }
 
   // TODO:
