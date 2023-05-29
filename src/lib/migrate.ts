@@ -8,7 +8,7 @@ const regStr = '^[0-9]+_([a-z]+)_(.+?)\\.csv$';
 const extractCoc = (filename: string): string[] => {
   const fileRegex = new RegExp(regStr, 'g');
   const splits = fileRegex.exec(filename);
-  return [ splits[1], splits[2] ];
+  return [splits[1], splits[2]];
 };
 
 enum FieldType {
@@ -167,17 +167,25 @@ class CsvLoader {
 }
 
 function outputError(saveRes: SaveResult, filename: string, index: number): void {
-  console.error(`Error occurs in ${filename}, at ${index+1} :`);
+  console.error(`Error occurs in ${filename}, at ${index + 1} :`);
   saveRes.errors.forEach(v => {
     console.error(v);
   });
 }
 
 function chunk<T extends any[]>(arr: T, size: number) {
-  return arr.reduce(
-      (newarr, _, i) => (i % size ? newarr : [...newarr, arr.slice(i, i + size)]),
-      [] as T[][]
-  )
+  if (size <= 0) return [];
+  const result = [];
+  let buf = [];
+  for (let i = 0, j = arr.length; i < j; i++) {
+    buf.push(arr[i]);
+    if (buf.length >= size) {
+      result.push(buf);
+      buf = [];
+    }
+  }
+  if (buf.length > 0) { result.push(buf); }
+  return result;
 }
 
 async function insertDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>, transactSize: number): Promise<Map<string, string>> {
@@ -190,16 +198,22 @@ async function insertDatas(connection: Connection, sobject: string, csvLoader: C
 
     // insert リクエスト
     const saveResult = await connection.sobject(sobject).create(data);
-    saveResult.forEach(saveRes => {
+    let hasError = false;
+
+    for (const saveRes of saveResult) {
       if (saveRes.errors.length > 0) {
         outputError(saveRes, csvLoader.fileName, index);
+        hasError = true;
       } else {
-        const idKey = csvLoader.rows[index].getIdKey();
+        const idKey = csvLoader.rows[index]?.getIdKey();
         const idValue = saveRes.id;
+        console.log(`index: [${index}] ${idKey} = ${idValue}`);
         idMap.set(idKey, idValue);
       }
       index++;
-    });
+      if (index > dataset.length) { return idMap; }
+    }
+    if (hasError) { process.exit(1); }
   }
 
   return idMap;
@@ -217,16 +231,20 @@ async function deleteDatas(connection: Connection, sobject: string, csvLoader: C
 
     // delete リクエスト
     const saveResult = await connection.sobject(sobject).del(targets);
+    let hasError = false;
 
     saveResult.forEach(saveRes => {
       if (saveRes.errors.length > 0) {
         outputError(saveRes, csvLoader.fileName, index);
+        hasError = true;
       } else {
         const idKey = csvLoader.rows[index].getIdKey();
+        console.log(`delete: ${idKey} = ${index}`);
         idMap.delete(idKey);
       }
       index++;
     });
+    if (hasError) { process.exit(1); }
   }
 
 
@@ -244,7 +262,7 @@ async function updateDatas(connection: Connection, sobject: string, csvLoader: C
     // 更新対象を org から取得
     const targetIds = targets.map(v => v['Id'] as string);
     let recs = await connection.sobject(sobject)
-      .find({ Id: { $in : targetIds } }, 'Id');
+      .find({ Id: { $in: targetIds } }, 'Id');
 
     // 更新項目の適用
     recs = recs.map(rec => {
