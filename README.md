@@ -21,8 +21,8 @@ To use your plugin, run using the local `./bin/dev` or `./bin/dev.cmd` file.
 
 ```bash
 # Run using local run file.
-./bin/dev hello world
-```
+./bin/dev azalea data apply --help
+****```
 
 There should be no differences when running via the Salesforce CLI or using the local run file. However, it can be useful to link the plugin to do some additional testing or run your commands from anywhere on your machine.
 
@@ -48,6 +48,7 @@ USAGE
 
 FLAGS
   -d, --directory=<value>  [default: data] CSV
+  -s, --execsize=<value>   [default: 20] 1回のDMLの最大実行サイズを指定します。デフォルトは 20 です。
   -u, --user=<value>       (required) Salesforce 組織のユーザ名を指定します。
 
 GLOBAL FLAGS
@@ -84,6 +85,6 @@ DESCRIPTION
   `update`, `delete` または参照項目の値で参照します。
 
 EXAMPLES
-  $ sf azalea data apply -u user_id@example.com -d directory_name
+  $ sf azalea data apply -u user_id@example.com -d directory_name -s 1
 
 <!-- commandsstop -->
