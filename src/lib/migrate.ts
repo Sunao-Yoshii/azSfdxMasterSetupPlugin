@@ -1,6 +1,6 @@
+import * as fs from 'fs';
 import { Connection } from '@salesforce/core';
 import { SaveResult } from 'jsforce';
-import * as fs from 'fs';
 import { parse } from 'csv-parse/sync';
 
 const regStr = '^[0-9]+_([a-z]+)_(.+?)\\.csv$';
@@ -100,7 +100,6 @@ class CsvLoader {
 
   private idMap: Map<string, string>;
   public fileName: string;
-  private dirname: string;
   private columnDefs: ColumnDefinition[];
   public rows: Row[];
 
@@ -173,10 +172,12 @@ function outputError(saveRes: SaveResult, filename: string, index: number): void
   });
 }
 
-function chunk<T extends any[]>(arr: T, size: number) {
+function chunk<T extends any[]>(arr: T, size: number): T[] {
   if (size <= 0) return [];
   const result = [];
   let buf = [];
+
+  console.log(`chunking: split ${arr.length} contains array to ${size} sized arrays.`);
   for (let i = 0, j = arr.length; i < j; i++) {
     buf.push(arr[i]);
     if (buf.length >= size) {
@@ -184,17 +185,21 @@ function chunk<T extends any[]>(arr: T, size: number) {
       buf = [];
     }
   }
-  if (buf.length > 0) { result.push(buf); }
+  if (buf.length > 0) {
+    result.push(buf);
+  }
+  console.log(`chunking(splitted : ${result.length} arrays.)`);
   return result;
 }
 
 async function insertDatas(connection: Connection, sobject: string, csvLoader: CsvLoader, idMap: Map<string, string>, transactSize: number): Promise<Map<string, string>> {
   const dataset = csvLoader.getAsJson();
-  console.log('insert:');
+  console.log(`insert transactSize: ${transactSize}`);
 
   let index = 0;
   const chunkedArrays = chunk(dataset, transactSize);
   for (const data of chunkedArrays) {
+    console.log('try');
 
     // insert リクエスト
     const saveResult = await connection.sobject(sobject).create(data);
@@ -214,6 +219,7 @@ async function insertDatas(connection: Connection, sobject: string, csvLoader: C
       if (index > dataset.length) { return idMap; }
     }
     if (hasError) { process.exit(1); }
+    console.log(`next: ${index}`);
   }
 
   return idMap;
@@ -226,6 +232,7 @@ async function deleteDatas(connection: Connection, sobject: string, csvLoader: C
   console.log('delete:');
   const chunkedArrays = chunk(deleteIds, transactSize);
   let index = 0;
+  console.log(`start: ${index}`);
 
   for (const targets of chunkedArrays) {
 
@@ -233,20 +240,19 @@ async function deleteDatas(connection: Connection, sobject: string, csvLoader: C
     const saveResult = await connection.sobject(sobject).del(targets);
     let hasError = false;
 
-    saveResult.forEach(saveRes => {
+    for (const saveRes of saveResult) {
       if (saveRes.errors.length > 0) {
         outputError(saveRes, csvLoader.fileName, index);
         hasError = true;
       } else {
-        const idKey = csvLoader.rows[index].getIdKey();
-        console.log(`delete: ${idKey} = ${index}`);
+        const idKey = csvLoader.rows[index]?.getIdKey();
+        console.log(`index: ${idKey} = ${index}`);
         idMap.delete(idKey);
       }
       index++;
-    });
+    }
     if (hasError) { process.exit(1); }
   }
-
 
   return idMap;
 }
@@ -258,6 +264,7 @@ async function updateDatas(connection: Connection, sobject: string, csvLoader: C
   const chunkedArrays = chunk(dataset, transactSize);
 
   let index = 0;
+  console.log(`start: ${index}`);
   for (const targets of chunkedArrays) {
     // 更新対象を org から取得
     const targetIds = targets.map(v => v['Id'] as string);

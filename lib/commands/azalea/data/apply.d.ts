@@ -1,5 +1,5 @@
 import { SfCommand } from '@salesforce/sf-plugins-core';
-export type AzaleaDataApplyResult = {
+export declare type AzaleaDataApplyResult = {
     executedFiles: string[];
 };
 export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
@@ -9,6 +9,7 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
     static readonly flags: {
         user: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         directory: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        execsize: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
     };
     run(): Promise<AzaleaDataApplyResult>;
 }

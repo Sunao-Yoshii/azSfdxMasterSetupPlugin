@@ -36,19 +36,20 @@ export async function findCsv(targetDir: string): Promise<string[]> {
   // console.log(allFiles);
 
   // sort map
-  const fileNumberMap = new Map<number, string>();
+  const fileNumberMap = new Map<number, string> ();
+  let maxNumber = 0;
   allFiles.forEach((value) => {
     const fileRegex = new RegExp(regStr, 'g');
-    const matches = fileRegex.exec(value)
-    fileNumberMap.set(Number(matches[1]), value);
+    const matches = fileRegex.exec(value);
+    const currentNumber = Number(matches[1]);
+    maxNumber = maxNumber < currentNumber ? currentNumber : maxNumber;
+    fileNumberMap.set(currentNumber, value);
   });
 
-  let n = 1;
   const result: string[] = [];
-  while(true) {
-    if (!fileNumberMap.has(n)) break;
+  for (let n = 1; n <= maxNumber; n++) {
+    if (!fileNumberMap.has(n)) continue;
     result.push(fileNumberMap.get(n));
-    n++;
   }
   return result;
 }

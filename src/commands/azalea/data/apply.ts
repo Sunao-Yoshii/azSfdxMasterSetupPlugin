@@ -38,7 +38,7 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
       summary: messages.getMessage('flags.transactsize.summary'),
       char: 's',
       required: false,
-      default: 20
+      default: '20'
     }),
   };
 
@@ -73,7 +73,7 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
     // loop execution files.
     for (const filename of csvNames) {
       this.log(`Executing ${filename}.....`);
-      await executeByCsv(directory, filename, connection, idMap, maxsize);
+      await executeByCsv(directory, filename, connection, idMap, Number(maxsize));
     }
 
     return {
