@@ -1,4 +1,5 @@
-import * as fs from 'fs';
+/* tslint:disable */
+import * as fs from 'node:fs';
 import { Connection } from '@salesforce/core';
 import { SaveResult } from 'jsforce';
 import { parse } from 'csv-parse/sync';
@@ -8,6 +9,7 @@ const regStr = '^[0-9]+_([a-z]+)_(.+?)\\.csv$';
 const extractCoc = (filename: string): string[] => {
   const fileRegex = new RegExp(regStr, 'g');
   const splits = fileRegex.exec(filename);
+  if (!splits) return [];
   return [splits[1], splits[2]];
 };
 
@@ -45,25 +47,25 @@ class Col {
     return this.key.columnName;
   }
 
-  public getValue(idMap: Map<string, string>): undefined {
+  public getValue(idMap: Map<string, string>): any {
     if (this.value === null || this.value === undefined || this.value.length === 0) {
       return null;
     }
     // console.log(`getValue : ${this.value}`);
     if (this.key.columnType === FieldType.Id || this.key.columnType === FieldType.Ref) {
       const res = idMap.get(this.value);
-      return res === undefined ? null : res as undefined;
+      return res === undefined ? null : res;
     }
     if (this.key.columnType === FieldType.Bool) {
-      return (this.value.toLowerCase() === 'true') as undefined;
+      return (this.value.toLowerCase() === 'true');
     }
     if (this.key.columnType === FieldType.Num) {
       const num: number = +this.value;
-      return num as undefined;
+      return num;
     }
 
     // その他は全部文字列として扱う
-    return this.value as undefined;
+    return this.value;
   }
 }
 
@@ -84,11 +86,11 @@ class Row {
   }
 
   public getIdKey() {
-    return this.columns.find(v => v.keyField.toLowerCase() === 'id').value;
+    return this.columns.find(v => v.keyField.toLowerCase() === 'id')?.value;
   }
 
-  public toJson(idMap: Map<string, string>): object {
-    const result = {};
+  public toJson(idMap: Map<string, string>): Record<string, any> {
+    const result: Record<string, any> = {};
     this.columns.forEach(col => {
       result[col.keyField] = col.getValue(idMap);
     });
@@ -100,8 +102,8 @@ class CsvLoader {
 
   private idMap: Map<string, string>;
   public fileName: string;
-  private columnDefs: ColumnDefinition[];
-  public rows: Row[];
+  private columnDefs: ColumnDefinition[] = [];
+  public rows: Row[] = [];
 
   public constructor(idMap: Map<string, string>, fileName: string, dirname: string) {
     this.idMap = idMap;
@@ -148,7 +150,7 @@ class CsvLoader {
     });
   }
 
-  public getAsJson(): object[] {
+  public getAsJson(): Record<string, any>[] {
     return this.rows.map(v => v.toJson(this.idMap));
   }
 
@@ -158,10 +160,11 @@ class CsvLoader {
     const records = parse(fileContent) as string[][];
 
     // ヘッダ読み込み
-    this.columnDefs = CsvLoader.parseHeader(records.shift());
+    const [head, ...tail] = records;
+    this.columnDefs = CsvLoader.parseHeader(head);
 
     // 行データの読み込み
-    this.rows = records.map(row => new Row(this.columnDefs, row));
+    this.rows = tail.map(row => new Row(this.columnDefs, row));
   }
 }
 
@@ -172,7 +175,7 @@ function outputError(saveRes: SaveResult, filename: string, index: number): void
   });
 }
 
-function chunk<T extends any[]>(arr: T, size: number): T[] {
+function chunk<T>(arr: T[], size: number): T[][] {
   if (size <= 0) return [];
   const result = [];
   let buf = [];
@@ -213,6 +216,14 @@ async function insertDatas(connection: Connection, sobject: string, csvLoader: C
         const idKey = csvLoader.rows[index]?.getIdKey();
         const idValue = saveRes.id;
         console.log(`index: [${index}] ${idKey} = ${idValue}`);
+        if (!idKey) {
+          index++;
+          continue;
+        }
+        if (!idValue) {
+          index++;
+          continue;
+        }
         idMap.set(idKey, idValue);
       }
       index++;
@@ -247,6 +258,10 @@ async function deleteDatas(connection: Connection, sobject: string, csvLoader: C
       } else {
         const idKey = csvLoader.rows[index]?.getIdKey();
         console.log(`index: ${idKey} = ${index}`);
+        if (!idKey) {
+          index++;
+          continue;
+        }
         idMap.delete(idKey);
       }
       index++;
@@ -312,5 +327,5 @@ export async function executeByCsv(dirname: string, filename: string, connection
   }
 
   // TODO:
-  return null;
+  return new Map<string, string>();
 }

@@ -47,9 +47,9 @@ USAGE
   $ sf azalea data apply -u <value> [--json] [-d <value>]
 
 FLAGS
-  -d, --directory=<value>  [default: data] CSV
-  -s, --execsize=<value>   [default: 20] 1回のDMLの最大実行サイズを指定します。デフォルトは 20 です。
-  -u, --user=<value>       (required) Salesforce 組織のユーザ名を指定します。
+  -d, --data-folder=<value>  [default: data] CSV
+  -s, --transactsize=<value> [default: 20] 1回のDMLの最大実行サイズを指定します。デフォルトは 20 です。
+  -u, --user=<value>         (required) Salesforce 組織のユーザ名を指定します。
 
 GLOBAL FLAGS
   --json  Format output as json.

@@ -1,17 +1,12 @@
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { SfCommand, Flags } from '@salesforce/sf-plugins-core';
 import { Messages, AuthInfo, Connection } from '@salesforce/core';
-import { findCsv } from '../../../lib/files';
-import { executeByCsv } from '../../../lib/migrate';
+import { findCsv } from '../../../libs/files.js';
+import { executeByCsv } from '../../../libs/migrate.js';
 
-Messages.importMessagesDirectory(__dirname);
-const messages = Messages.load('azalea-works', 'azalea.data.apply', [
-  'summary',
-  'description',
-  'examples',
-  'flags.user.summary',
-  'flags.transactsize.summary',
-  'flags.directory.summary',
-]);
+Messages.importMessagesDirectory(dirname(fileURLToPath(import.meta.url)));
+const messages = Messages.loadMessages('azalea-works', 'azalea.data.apply');
 
 export type AzaleaDataApplyResult = {
   executedFiles: string[];
@@ -28,17 +23,17 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
       char: 'u',
       required: true,
     }),
-    directory: Flags.string({
-      summary: messages.getMessage('flags.directory.summary'),
+    'data-folder': Flags.string({
+      summary: messages.getMessage('flags.data-folder.summary'),
       char: 'd',
-      required: false,
-      default: 'data'
+      default: 'data',
     }),
-    execsize: Flags.string({
+    transactsize: Flags.integer({
       summary: messages.getMessage('flags.transactsize.summary'),
-      char: 's',
-      required: false,
-      default: '20'
+      char: 't',
+      min: 1,
+      max: 200,
+      default: 20,
     }),
   };
 
@@ -46,19 +41,19 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
     const { flags } = await this.parse(AzaleaDataApply);
 
     const user = flags.user;
-    const directory = flags.directory;
-    const maxsize = flags.execsize;
+    const directory = flags['data-folder'];
+    const maxsize = flags.transactsize;
 
     this.log(`Running as ${user}. Searching csv files from ${directory}.(Transaction size : ${maxsize})`);
 
     // load files.
     const csvNames = await findCsv(directory);
-    this.log(`Execution files: ${csvNames}`);
+    this.log(`Execution files: [${csvNames.join(',')}]`);
 
     // return if no files.
     if (csvNames.length === 0) {
       return {
-        executedFiles:[],
+        executedFiles: [],
       };
     }
 
@@ -68,9 +63,8 @@ export default class AzaleaDataApply extends SfCommand<AzaleaDataApplyResult> {
     const connection = await Connection.create({ authInfo });
 
     // definition id marker.
-    const idMap: Map<string, string> = new Map<string, string> ();
+    const idMap: Map<string, string> = new Map<string, string>();
 
-    // loop execution files.
     for (const filename of csvNames) {
       this.log(`Executing ${filename}.....`);
       await executeByCsv(directory, filename, connection, idMap, Number(maxsize));

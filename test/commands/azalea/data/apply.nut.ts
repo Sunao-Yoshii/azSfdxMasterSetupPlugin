@@ -5,7 +5,7 @@ describe('azalea data apply NUTs', () => {
   let session: TestSession;
 
   before(async () => {
-    session = await TestSession.create();
+    session = await TestSession.create({ devhubAuthStrategy: 'NONE' });
   });
 
   after(async () => {

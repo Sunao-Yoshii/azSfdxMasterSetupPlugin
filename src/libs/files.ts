@@ -1,4 +1,5 @@
-import * as fs from 'fs';
+/* tslint:disable */
+import * as fs from 'node:fs';
 
 const regStr = '^([0-9]+)_(insert|update|delete)_(.+?)\\.csv$';
 
@@ -9,7 +10,7 @@ function extension(element: string): boolean {
 
 function listupCsv(targetDir: string): Promise<string[]> {
   const filePaths: string[] = [];
-  return new Promise<string[]> ((resolve, reject) => {
+  return new Promise<string[]>((resolve, reject) => {
     fs.readdir(targetDir, (err, list) => {
       if (err) {
         reject(err);
@@ -36,11 +37,12 @@ export async function findCsv(targetDir: string): Promise<string[]> {
   // console.log(allFiles);
 
   // sort map
-  const fileNumberMap = new Map<number, string> ();
+  const fileNumberMap = new Map<number, string>();
   let maxNumber = 0;
   allFiles.forEach((value) => {
     const fileRegex = new RegExp(regStr, 'g');
     const matches = fileRegex.exec(value);
+    if (!matches) return;
     const currentNumber = Number(matches[1]);
     maxNumber = maxNumber < currentNumber ? currentNumber : maxNumber;
     fileNumberMap.set(currentNumber, value);
@@ -48,8 +50,10 @@ export async function findCsv(targetDir: string): Promise<string[]> {
 
   const result: string[] = [];
   for (let n = 1; n <= maxNumber; n++) {
-    if (!fileNumberMap.has(n)) continue;
-    result.push(fileNumberMap.get(n));
+    const data = fileNumberMap.get(n);
+    if (data) {
+      result.push(data);
+    }
   }
   return result;
 }
